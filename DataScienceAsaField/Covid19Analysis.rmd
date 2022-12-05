@@ -1,6 +1,6 @@
 ---
 title: "Covid-19 Analysis"
-author: Aditya Madan
+author: 'Aditya Madan'
 date: '2022-12-02'
 output:
   html_document: default

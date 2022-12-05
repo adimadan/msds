@@ -1,0 +1,118 @@
+---
+title: "NY Shooting Incident Historical Analysis"
+author: 'Aditya Madan'
+date: '2022-06-24'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## 0. Importing libraries
+```{r library}
+library(tidyverse)
+library(lubridate)
+```
+
+## 1. Importing data
+Data consists of every shooting incident that occurred in NYC going back to 2006 through the end of the previous calendar year (2021). 
+
+This data is manually extracted every quarter and reviewed by the Office of Management Analysis and Planning before being posted on the NYPD website. Each record represents a shooting incident in NYC and includes information about the event, the location and time of occurrence. In addition, information related to suspect and victim demographics is also included. 
+
+Reference: https://catalog.data.gov/dataset/nypd-shooting-incident-data-historic
+
+```{r import_data}
+# Import the data by directly reading the csv file and display it
+nypd_data = read_csv('https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv')
+nypd_data
+```
+
+## 2. Data cleaning and transformation
+(i) Remove columns not used for analysis:
+(X_COORD_CD,Y_COORD_CD,Latitude,Longitude,Lon_Lat, PRECINCT,JURISDICTION_CODE)
+
+(ii) Remove columns with missing data:
+(PERP_RACE, PERP_AGE_GROUP, PERP_SEX)
+
+(iii) Date column converted to date type and a YEAR column added for analysis.
+
+```{r clean_data}
+nypd_data_clean = subset(nypd_data, select = -c(X_COORD_CD,Y_COORD_CD,Latitude,Longitude,Lon_Lat,PERP_RACE,PERP_AGE_GROUP, PERP_SEX, PRECINCT,JURISDICTION_CODE) )
+
+# Convert column to type date
+nypd_data_clean = nypd_data_clean %>% mutate(OCCUR_DATE = mdy(OCCUR_DATE))
+
+# Add a YEAR column
+nypd_data_clean_with_year = nypd_data_clean %>% mutate(YEAR = year(OCCUR_DATE))
+nypd_data_clean_with_year
+```
+
+## 3. Visualizations and analysis
+### Shooting Incidents by year
+Grouping total incidents by year to see the historical trend.
+```{r Incidents_By_Year, echo=FALSE}
+nypd_data_by_year= nypd_data_clean_with_year %>%
+     group_by(YEAR) %>%
+     summarise(count=n())
+nypd_data_by_year
+
+ggplot(data=nypd_data_by_year, aes(x=YEAR, y=count,group=1)) +
+  geom_line(color="red") +
+  geom_point(color="blue")
+
+```
+
+#### Analysis
+As can be seen from the above line graph, the shooting incidents in early 2000s were high but they started coming down in mid-2010s and were lowest in 2018-2019 timeframe, but between 2019 and 2020 they grew at the fastest rate and came back to the comparable level as the early 2000s which is worth further exploration.
+
+### Shooting Incidents by Borough
+Grouping total incidents by Borough.
+```{r Incidents_By_Boro, echo=FALSE}
+nypd_data_by_boro=nypd_data_clean %>%
+     group_by(BORO) %>%
+     summarise(count=n())
+nypd_data_by_boro
+piepercent = round(100*nypd_data_by_boro$count/sum(nypd_data_by_boro$count), 1)
+
+pie(nypd_data_by_boro$count, labels = piepercent, main = "Boro pie chart",col = rainbow(length(nypd_data_by_boro$BORO)))
+legend("topright", nypd_data_by_boro$BORO, cex = 0.8,
+   fill = rainbow(length(nypd_data_by_boro$BORO)))
+```
+
+#### Analysis
+As can be seen from the above pie chart, out of all boroughs in Manhattan, Brooklyn has the highest percentage of total shooting incidents while Staten Island the lowest. But one thing to keep in mind is that this doesn't mean Brooklyn has the highest shooting incident rate per person, to get that we need to divide by the population of the respective boroughs for which we need to join with population dataset for all boroughs.
+
+### Shooting Incidents by Race
+Grouping total incidents by Race.
+```{r Incidents_By_Race, echo=FALSE}
+nypd_data_by_race=nypd_data_clean %>%
+     group_by(VIC_RACE) %>%
+     summarise(count=n())
+nypd_data_by_race
+
+# remove the "/" character for the bar plot to show all races
+transformed_race = paste0(nypd_data_by_race$VIC_RACE, "/")
+barplot(nypd_data_by_race$count, names.arg = substring(transformed_race, 0, regexpr("/", transformed_race) - 1), xlab ="Race", 
+        ylab ="count", col = c('green', 'blue', 'red', 'orange', 'yellow', 'brown','violet'),
+        main ="Total Incidents by Race",  width=10.0)
+
+```
+
+#### Analysis
+As can be seen from the above bar chart, the numbers are heavily skewed towards a particular race. 
+But there can be racial bias in collection or observation of data and to mitigate that bias additional trusted sources of data should be used that takes into account population composition by race.
+
+
+## 4. Conclusion and Bias identification
+It's interesting to see how the historical trend of shooting incidents changed over time, which boroughs are affected the most and which race(s) contributed to such incidents and at the same time it raises some questions that require more rigorous analysis than discussed as part of scope of this assignment.
+
+Additionally, analysis can be done on other factors like location, agegroup, sex and/or we can further drilldown to focus on a particular factor or a combination of factors like the last calendar year and/or a particular borough to explore further.
+
+A common bias is Racial bias which is also my personal bias with respect to given data and is just one of the biases that could be present in the data as part of the collection and observation process or the data analysis process which falls under a data scientist's purview, so due attention should be paid to it.To do comprehensive analysis and mitigate various biases, we should get additional datasets like demographic information of the boroughs that has population data considering factors like race, sex, age, etc.
+
+## 6. Link to Git
+https://github.com/adimadan/msds/tree/main/DataScienceAsaField
