@@ -1,0 +1,201 @@
+---
+title: "Covid-19 Analysis"
+author:
+date: '2022-12-02'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## 0. Importing libraries
+```{r library}
+library(tidyverse)
+library(lubridate)
+```
+
+## 1. Importing data
+Data consists of Covid cases from 2020 to 2022 till date. There are 2 time series tables for Global confirmed cases and deaths and similarly are 2 time series tables for the US confirmed cases and deaths.
+
+Reference: https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_time_series
+
+```{r import_data}
+# Import the data by directly reading the csv file and display it
+url_in = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/'
+file_names=c('time_series_covid19_confirmed_US.csv','time_series_covid19_confirmed_global.csv','time_series_covid19_deaths_US.csv','time_series_covid19_deaths_global.csv')
+
+urls = str_c(url_in, file_names)
+
+us_cases = read_csv(urls[1])
+global_cases = read_csv(urls[2])
+us_deaths = read_csv(urls[3])
+global_deaths = read_csv(urls[4])
+
+
+```
+
+
+## 2. Data cleaning and transformation
+```{r transform_data}
+# transform global data
+# pivot the data such that dates show up as rows instead of columns as it will make analysis easier
+global_cases = global_cases %>%
+	pivot_longer(cols = -c('Province/State','Country/Region', Lat, Long),
+	names_to = "date",
+	values_to = "cases")%>%
+ select(-c(Lat, Long))
+ 
+ global_deaths = global_deaths %>%
+ 	pivot_longer(cols = -c('Province/State','Country/Region', Lat, Long),
+ 	names_to = "date",
+ 	values_to = "deaths")%>%
+ select(-c(Lat, Long))
+ 
+ global = global_cases %>%
+ 		full_join(global_deaths)%>%
+ 		rename(Country_Region='Country/Region',
+ 		       Province_State='Province/State')%>%
+ 		mutate(date = mdy(date))
+ 		
+ global = global %>% filter(cases > 0)
+ 
+ 
+ # transform US data
+ us_cases = us_cases %>%
+ 	pivot_longer(cols = -(UID:Combined_Key),
+ 	names_to = "date",
+ 	values_to = "cases")%>%
+ 	select(Admin2:cases)%>%
+ 	mutate(date = mdy(date)) %>%
+ 	select(-c(Lat, Long_))
+ 	
+ 	
+  us_deaths = us_deaths %>%
+  	pivot_longer(cols = -(UID:Population),
+  	names_to = "date",
+  	values_to = "deaths")%>%
+  	select(Admin2:deaths)%>%
+  	mutate(date = mdy(date)) %>%
+ 	select(-c(Lat, Long_))
+ 	
+ us = us_cases %>%
+ 	full_join(us_deaths)
+ 
+ us = us %>% filter(cases > 0)
+
+```
+
+## 3. Visualizations and analysis
+### Global (Top 10 Countries with covid cases)
+```{r Top_10_Countries, echo=FALSE}
+ global_totals_by_country = global%>%
+   	group_by(Country_Region) %>%
+   	summarize(cases=sum(cases), deaths=sum(deaths))
+  	
+  	
+  global_totals_by_country = global_totals_by_country[order(global_totals_by_country$cases, decreasing = TRUE),]
+   
+  
+  global_totals_by_country_top10 = global_totals_by_country[1:10,]
+  
+  
+  piepercent = round(100*global_totals_by_country_top10$cases/sum(global_totals_by_country_top10$cases), 1)
+  
+  pie(global_totals_by_country_top10$cases, labels = piepercent, main = "Top 10 Countries Covid cases pie chart",col = rainbow(length(global_totals_by_country_top10$Country_Region)))
+  legend("topright", global_totals_by_country_top10$Country_Region, cex = 0.8,
+    fill = rainbow(length(global_totals_by_country_top10$Country_Region)))
+```
+
+
+### US (Top 10 States with covid cases)
+```{r Top_10_USStates, echo=FALSE}
+us_totals_by_state = us%>%
+  	group_by(Province_State) %>%
+  	summarize(cases=sum(cases), deaths=sum(deaths))
+ 	
+ 	
+ us_totals_by_state = us_totals_by_state[order(us_totals_by_state$cases, decreasing = TRUE),]
+  
+ 
+ us_totals_by_state_top10 = us_totals_by_state[1:10,]
+ 
+ 
+ piepercent = round(100*us_totals_by_state_top10$cases/sum(us_totals_by_state_top10$cases), 1)
+ 
+ pie(us_totals_by_state_top10$cases, labels = piepercent, main = "Top 10 states Covid cases pie chart",col = rainbow(length(us_totals_by_state_top10$Province_State)))
+ legend("topright", us_totals_by_state_top10$Province_State, cex = 0.8,
+   fill = rainbow(length(us_totals_by_state_top10$Province_State)))
+```
+
+#### Analysis
+As can be visualized from the pie chart, globally we can see that US and India are the top 2 countries with the most number of cases, followed by Brazil, France and Germany.
+For US, California, Texas and Florida have the highest number of cases.
+
+### Global (Total covid cases & deaths by Year)
+```{r TotalCases_ByYear, echo=FALSE}
+ # Add a YEAR column
+   global_with_year = global%>% mutate(YEAR = year(date))
+  
+   global_totals_by_year = global_with_year%>%
+     	group_by(YEAR) %>%
+    	summarize(cases=sum(cases), deaths=sum(deaths))
+    	
+   ggplot(data=global_totals_by_year, aes(x=YEAR, y=cases,group=1)) +
+     geom_line(color="red") +
+    geom_point(color="blue")
+    
+   ggplot(data=global_totals_by_year, aes(x=YEAR, y=deaths,group=1)) +
+      geom_line(color="red") +
+  geom_point(color="blue")
+```
+
+
+### US (Total covid cases & deaths by Year)
+```{r USTotalCases_ByYear, echo=FALSE}
+ us_with_year = us%>% mutate(YEAR = year(date))
+ 
+  us_totals_by_year = us_with_year%>%
+    	group_by(YEAR) %>%
+   	summarize(cases=sum(cases), deaths=sum(deaths))
+   	
+  ggplot(data=us_totals_by_year, aes(x=YEAR, y=cases,group=1)) +
+    geom_line(color="red") +
+   geom_point(color="blue")
+   
+  ggplot(data=us_totals_by_year, aes(x=YEAR, y=deaths,group=1)) +
+     geom_line(color="red") +
+  geom_point(color="blue")
+
+```
+
+#### Analysis
+From 2020 to 2022, we can see that although there is an upward trend in the total number of covid cases, the total number of deaths the trend is going downward and this is the case both globally and within US.
+
+## 4. Model
+### Global (Linear Regression model)
+```{r Global_Model, echo=FALSE}
+ global_mod = lm(deaths ~ cases, data=global_totals_by_country)
+ global_totals_with_pred = global_totals_by_country %>% mutate(pred = predict(global_mod))
+ global_totals_with_pred %>% ggplot() + geom_point(aes(x=cases, y=deaths), color="blue") + geom_point(aes(x=cases, y=pred), color="red")
+```
+
+### US (Linear Regression model)
+```{r US_Model, echo=FALSE}
+  mod = lm(deaths ~ cases, data=us_totals_by_state)
+  us_totals_with_pred = us_totals_by_state %>% mutate(pred = predict(mod))
+  us_totals_with_pred %>% ggplot() + geom_point(aes(x=cases, y=deaths), color="blue") + geom_point(aes(x=cases, y=pred), color="red")
+```
+
+#### Analysis
+Goal is to predict deaths from the cases and compare the prediction with the actual values. US linear regression model looks to fit better than the global model which has more outliers.
+
+## 5. Conclusion & Bias
+It's interesting to see what the top countries are in terms of total number of covid cases globally and for US what are the top states. Also we looked at the year to year trend in total number of covid cases and deaths. We also saw a simple linear regression model for US had better fit/prediction than the global one. Additionally further analyses can be performed taking population into account.
+As far as bias is concerned, data collection globally cannot be expected to be fair in all countries and it could be unintentional due to unavailability of infrastructure to collect and report the data or could be intentional due to political, socio, cultural factors resulting in not all cases getting reported.
+
+## 6. Link to Git
+
