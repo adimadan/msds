@@ -1,6 +1,6 @@
 ---
 title: "Covid-19 Analysis"
-author:
+author: Aditya Madan
 date: '2022-12-02'
 output:
   html_document: default
@@ -198,4 +198,4 @@ It's interesting to see what the top countries are in terms of total number of c
 As far as bias is concerned, data collection globally cannot be expected to be fair in all countries and it could be unintentional due to unavailability of infrastructure to collect and report the data or could be intentional due to political, socio, cultural factors resulting in not all cases getting reported.
 
 ## 6. Link to Git
-
+https://github.com/adimadan/msds/tree/main/DataScienceAsaField
